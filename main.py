@@ -1,45 +1,54 @@
 import os
 import uvicorn
 from fastapi import FastAPI, Form, Response
-from melo.api import TTS
+from TTS.api import TTS
+import torch
 
-print("⏳ Initializing MeloTTS...")
-device = 'cpu'
-model = TTS(language='EN', device=device)
-speaker_ids = model.hps.data.spk2id
+# 🚀 Load XTTS v2 (The Beast)
+print("⏳ Loading XTTS v2 Model (This will utilize your 32GB RAM)...")
+device = "cpu"
 
-print(f"\n🎤 AVAILABLE SPEAKERS: {speaker_ids}\n")
+# یہ پہلی بار ماڈل ڈاؤن لوڈ کرے گا (تقریباً 2-3 GB)
+tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
 
 app = FastAPI()
 
+# 🎤 آپ کی آواز کی فائل کا نام
+SPEAKER_WAV = "male_voice.wav"
+
 @app.get("/")
 def home():
-    return {"status": "MeloTTS Ready", "speakers": str(speaker_ids)}
+    return {"status": "XTTS Cloning Server Ready 🧬"}
 
 @app.post("/speak")
 async def speak(text: str = Form(...)):
-    print(f"🎙️ Generating: {text[:20]}...")
+    print(f"🎙️ Cloning Request: {text[:30]}...")
     output_path = "output.wav"
     
+    # ⚠️ Check if voice sample exists
+    if not os.path.exists(SPEAKER_WAV):
+        return Response(content="Error: 'my_voice.wav' not found! Please upload your voice sample.", status_code=500)
+
     try:
-        # 🎯 EXACT MATCH from Logs
-        # لاگز کے مطابق صحیح نام 'EN_INDIA' ہے
-        speaker_key = 'EN_INDIA' 
+        # 🔥 GENERATION
+        # language='hi' use kar rahe hain kyunke XTTS Urdu ko Hindi engine ke through best bolta hai
+        tts.tts_to_file(
+            text=text,
+            speaker_wav=SPEAKER_WAV,
+            language="hi", 
+            file_path=output_path
+        )
         
-        # Fallback if key changes
-        if speaker_key not in speaker_ids:
-            speaker_key = 'EN-US'
-            
-        model.tts_to_file(text, speaker_ids[speaker_key], output_path, speed=1.0)
-        
+        # Read & Return
         with open(output_path, "rb") as f:
             audio_data = f.read()
             
         return Response(content=audio_data, media_type="audio/wav")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ XTTS Error: {e}")
         return Response(content=str(e), status_code=500)
 
 if __name__ == "__main__":
+    # 8080 Port Lazmi hai Railway ke liye
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
