@@ -1,62 +1,72 @@
 import os
 import uvicorn
-import time
+import sherpa_onnx
 from fastapi import FastAPI, Form, Response
-import torch
-# ✅ Fix for Security Error
-torch.serialization.add_safe_globals = lambda *args, **kwargs: None 
-from TTS.api import TTS
+import time
 
-# 🚀 FORCE CPU POWER (32 Cores Use Karo!)
-torch.set_num_threads(32)
-print(f"🔥 CPU Threads set to: {torch.get_num_threads()}")
+print("⏳ Initializing Alibaba CosyVoice (via Sherpa-ONNX)...")
 
-print("⏳ Loading XTTS v2 Model...")
-start_load = time.time()
-device = "cpu"
-tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
-print(f"✅ Model Loaded in {time.time() - start_load:.2f} seconds!")
+# ⚙️ MODEL CONFIGURATION
+# یہ سیٹنگز CPU پر بیسٹ پرفارمنس کے لیے ہیں
+model_dir = "./model_data"
+config = sherpa_onnx.OfflineTtsConfig(
+    model=sherpa_onnx.OfflineTtsModelConfig(
+        cosyvoice=sherpa_onnx.OfflineTtsCosyVoiceModelConfig(
+            model=f"{model_dir}/cosyvoice-model.onnx",
+        ),
+    ),
+    rule_fsts=f"{model_dir}/date.fst,{model_dir}/phone.fst",
+    max_num_sentences=1,
+)
+
+# 🚀 LOAD ENGINE
+try:
+    tts = sherpa_onnx.OfflineTts(config)
+    print("✅ Alibaba CosyVoice Engine Started Successfully!")
+except Exception as e:
+    print(f"❌ Engine Start Error: {e}")
+    exit(1)
 
 app = FastAPI()
 SPEAKER_WAV = "my_voice.wav"
 
 @app.get("/")
 def home():
-    return {"status": "XTTS Ready", "threads": torch.get_num_threads()}
+    return {"status": "Alibaba CosyVoice Running 🚀"}
 
 @app.post("/speak")
 async def speak(text: str = Form(...)):
-    print(f"\n📨 Received Request: '{text[:20]}...'")
+    start_time = time.time()
+    print(f"🎙️ Generating for: {text[:20]}...")
     
-    if not os.path.exists(SPEAKER_WAV):
-        print("❌ Error: my_voice.wav not found!")
-        return Response(content="Voice sample missing", status_code=500)
+    output_path = f"generated_{os.urandom(4).hex()}.wav"
 
-    output_path = f"output_{os.urandom(4).hex()}.wav"
-    
+    if not os.path.exists(SPEAKER_WAV):
+        return Response(content="Error: my_voice.wav not found!", status_code=500)
+
     try:
-        start_gen = time.time()
-        print("⚙️ Processing Started...")
+        # 🔥 GENERATION COMMAND
+        # sid=0 (Automatic Language Detection)
+        audio = tts.generate(text, sid=0, speed=1.0)
         
-        # 🔥 GENERATION
-        tts.tts_to_file(
-            text=text,
-            speaker_wav=SPEAKER_WAV,
-            language="hi", # Hindi/Urdu
-            file_path=output_path
-        )
+        # Save audio (Sherpa generates raw samples, we save as Wav)
+        if len(audio.samples) == 0:
+             return Response(content="Empty Audio Generated", status_code=500)
+             
+        audio.save(output_path)
         
-        duration = time.time() - start_gen
-        print(f"✅ Audio Generated in {duration:.2f} seconds!")
-        
+        duration = time.time() - start_time
+        print(f"✅ Generated in {duration:.2f} seconds!")
+
+        # Read and Return
         with open(output_path, "rb") as f:
             audio_data = f.read()
-            
-        os.remove(output_path) # Cleanup
-        return Response(content=audio_data, media_type="audio/wav")
         
+        os.remove(output_path)
+        return Response(content=audio_data, media_type="audio/wav")
+
     except Exception as e:
-        print(f"❌ CRITICAL ERROR: {e}")
+        print(f"❌ Error: {e}")
         return Response(content=str(e), status_code=500)
 
 if __name__ == "__main__":
