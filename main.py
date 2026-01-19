@@ -4,20 +4,28 @@ import sherpa_onnx
 from fastapi import FastAPI, Form, Response
 import time
 
-print("⏳ Initializing Alibaba CosyVoice (via Sherpa-ONNX)...")
+print("⏳ Initializing Alibaba CosyVoice (Sherpa Engine)...")
 
-# ⚙️ MODEL CONFIGURATION
-# Hugging Face Repo se file ka naam 'model.onnx' hota hai
+# ⚙️ MODEL PATH CONFIGURATION
+# Hugging Face Clone se ye files ayengi:
 model_dir = "./model_data"
+
+# Check files exist (Debugging)
+if not os.path.exists(f"{model_dir}/model.onnx"):
+    print("❌ CRITICAL: model.onnx not found! Git clone failed.")
+    exit(1)
+
 config = sherpa_onnx.OfflineTtsConfig(
     model=sherpa_onnx.OfflineTtsModelConfig(
         cosyvoice=sherpa_onnx.OfflineTtsCosyVoiceModelConfig(
-            model=f"{model_dir}/model.onnx", # ✅ Corrected Name
+            model=f"{model_dir}/model.onnx", # Main Model
         ),
     ),
-    rule_fsts=f"{model_dir}/date.fst,{model_dir}/phone.fst",
+    # CosyVoice ke liye tokens.txt zaroori hota hai
+    rule_fsts="", 
     max_num_sentences=1,
 )
+# Note: Sherpa automatically looks for 'tokens.txt' in the same dir as model.onnx
 
 # 🚀 LOAD ENGINE
 try:
@@ -25,7 +33,6 @@ try:
     print("✅ Alibaba CosyVoice Engine Started Successfully!")
 except Exception as e:
     print(f"❌ Engine Start Error: {e}")
-    # Agar error aye to exit karo takay logs mein nazar aye
     exit(1)
 
 app = FastAPI()
@@ -33,7 +40,7 @@ SPEAKER_WAV = "my_voice.wav"
 
 @app.get("/")
 def home():
-    return {"status": "Alibaba CosyVoice Running 🚀"}
+    return {"status": "CosyVoice Running 🚀"}
 
 @app.post("/speak")
 async def speak(text: str = Form(...)):
@@ -43,22 +50,21 @@ async def speak(text: str = Form(...)):
     output_path = f"generated_{os.urandom(4).hex()}.wav"
 
     if not os.path.exists(SPEAKER_WAV):
-        print("❌ my_voice.wav NOT FOUND!")
-        return Response(content="Error: my_voice.wav not found!", status_code=500)
+        print("❌ my_voice.wav missing!")
+        return Response(content="Voice sample missing", status_code=500)
 
     try:
-        # 🔥 GENERATION COMMAND
-        # sid=0 means auto-detect language based on text
+        # 🔥 GENERATION
+        # sid=0 (Auto/Single Speaker from Wav)
         audio = tts.generate(text, sid=0, speed=1.0)
         
         if len(audio.samples) == 0:
-             print("❌ Sherpa generated 0 bytes audio")
-             return Response(content="Empty Audio Generated", status_code=500)
+             return Response(content="Empty Audio", status_code=500)
              
         audio.save(output_path)
         
         duration = time.time() - start_time
-        print(f"✅ Generated in {duration:.2f} seconds!")
+        print(f"✅ Generated in {duration:.2f}s")
 
         with open(output_path, "rb") as f:
             audio_data = f.read()
