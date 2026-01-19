@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+torch
+torchaudio
+melo-tts
+unidic-lite
+mecab-python3
+scipy
