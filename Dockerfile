@@ -1,4 +1,5 @@
-FROM python:3.9-slim
+# ✅ Change 3.9 to 3.10 (MeloTTS needs 3.10+)
+FROM python:3.10-slim
 
 # System Deps
 RUN apt-get update && apt-get install -y \
@@ -6,6 +7,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Upgrade pip (Good practice)
+RUN pip install --upgrade pip
 
 # Install Python Deps
 COPY requirements.txt .
