@@ -6,26 +6,30 @@ import time
 
 print("⏳ Initializing Alibaba CosyVoice (Sherpa Engine)...")
 
-# ⚙️ MODEL PATH CONFIGURATION
-# Hugging Face Clone se ye files ayengi:
+# ⚙️ MODEL PATH
 model_dir = "./model_data"
+model_path = f"{model_dir}/model.onnx"
+tokens_path = f"{model_dir}/tokens.txt"
 
-# Check files exist (Debugging)
-if not os.path.exists(f"{model_dir}/model.onnx"):
-    print("❌ CRITICAL: model.onnx not found! Git clone failed.")
+# ✅ Verification Check
+if not os.path.exists(model_path):
+    print(f"❌ CRITICAL ERROR: {model_path} not found!")
     exit(1)
+if not os.path.exists(tokens_path):
+    print(f"❌ CRITICAL ERROR: {tokens_path} not found!")
+    exit(1)
+
+print(f"📦 Model found! Loading...")
 
 config = sherpa_onnx.OfflineTtsConfig(
     model=sherpa_onnx.OfflineTtsModelConfig(
         cosyvoice=sherpa_onnx.OfflineTtsCosyVoiceModelConfig(
-            model=f"{model_dir}/model.onnx", # Main Model
+            model=model_path,
         ),
     ),
-    # CosyVoice ke liye tokens.txt zaroori hota hai
     rule_fsts="", 
     max_num_sentences=1,
 )
-# Note: Sherpa automatically looks for 'tokens.txt' in the same dir as model.onnx
 
 # 🚀 LOAD ENGINE
 try:
@@ -55,7 +59,6 @@ async def speak(text: str = Form(...)):
 
     try:
         # 🔥 GENERATION
-        # sid=0 (Auto/Single Speaker from Wav)
         audio = tts.generate(text, sid=0, speed=1.0)
         
         if len(audio.samples) == 0:
