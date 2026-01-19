@@ -4,7 +4,7 @@ import sherpa_onnx
 from fastapi import FastAPI, Form, Response
 import time
 
-print("⏳ Initializing Alibaba CosyVoice (Sherpa 1.10.16)...")
+print("⏳ Initializing Alibaba CosyVoice (Sherpa 1.10.45)...")
 
 model_dir = "./model_data"
 model_path = f"{model_dir}/model.onnx"
@@ -14,9 +14,8 @@ if not os.path.exists(model_path):
     print("❌ Critical: Model file missing!")
     exit(1)
 
-# 🔥 DIRECT CONFIGURATION (No Fancy Classes)
+# 🔥 DIRECT CONFIGURATION
 try:
-    # 1.10.16 mein ye structure tha
     config = sherpa_onnx.OfflineTtsConfig(
         model=sherpa_onnx.OfflineTtsModelConfig(
             cosyvoice=sherpa_onnx.OfflineTtsCosyVoiceModelConfig(
@@ -27,25 +26,23 @@ try:
         max_num_sentences=1,
     )
     tts = sherpa_onnx.OfflineTts(config)
-    print("✅ Engine Started Successfully (Standard Mode)!")
+    print("✅ Engine Started Successfully!")
 
 except AttributeError:
-    print("⚠️ Standard Config Failed. Trying Raw Struct...")
-    # AGAR STANDARD FAIL HO TO YEH CHALE GA
-    # Hum config ko manually build kar rahe hain
+    # Fallback to VITS structure if CosyVoice config fails
+    print("⚠️ Standard Config Failed. Trying VITS Hack...")
     try:
-        tts = sherpa_onnx.OfflineTts(
-            config=sherpa_onnx.OfflineTtsConfig(
-                model=sherpa_onnx.OfflineTtsModelConfig(
-                    # Yahan hum VITS ke through load karne ki koshish karein ge (Hack)
-                    # Kyunke kabhi kabhi internal mapping same hoti hai
-                    vits=sherpa_onnx.OfflineTtsVitsModelConfig(
-                        model=model_path,
-                        tokens=tokens_path,
-                    ),
-                )
-            )
+        config = sherpa_onnx.OfflineTtsConfig(
+            model=sherpa_onnx.OfflineTtsModelConfig(
+                vits=sherpa_onnx.OfflineTtsVitsModelConfig(
+                    model=model_path,
+                    tokens=tokens_path,
+                ),
+            ),
+            rule_fsts="",
+            max_num_sentences=1,
         )
+        tts = sherpa_onnx.OfflineTts(config)
         print("✅ Engine Started via VITS Hack!")
     except Exception as e2:
         print(f"❌ Both Methods Failed: {e2}")

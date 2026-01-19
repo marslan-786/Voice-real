@@ -8,10 +8,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# ✅ Install Specific Stable Version (1.10.16)
-# Yeh version CosyVoice support ke sath aya tha aur stable tha
+# ✅ Install Specific Stable Version (1.10.45)
+# Yeh version PyPI par mojood hai aur CosyVoice support karta hai
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir sherpa-onnx==1.10.16 fastapi uvicorn python-multipart
+    pip install --no-cache-dir sherpa-onnx==1.10.45 fastapi uvicorn python-multipart
 
 # ✅ DOWNLOAD MODEL (Direct Curl)
 RUN mkdir -p model_data
