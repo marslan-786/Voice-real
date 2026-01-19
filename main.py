@@ -1,42 +1,83 @@
 import os
 import uvicorn
+import sherpa_onnx
 from fastapi import FastAPI, Form, Response
-from melo.api import TTS
+import time
 
-# 🚀 Initialize MeloTTS
-# 'EN' language does NOT use MeCab, so it's safe
-print("⏳ Initializing MeloTTS (EN Mode)...")
-try:
-    device = 'cpu'
-    model = TTS(language='EN', device=device)
-    speaker_ids = model.hps.data.spk2id
-    print("✅ MeloTTS Loaded Successfully!")
-except Exception as e:
-    print(f"❌ Init Error: {e}")
+print("⏳ Initializing Alibaba CosyVoice (Universal Mode)...")
+
+model_dir = "./model_data"
+model_path = f"{model_dir}/model.onnx"
+tokens_path = f"{model_dir}/tokens.txt"
+
+if not os.path.exists(model_path):
+    print("❌ CRITICAL: Model file missing!")
     exit(1)
 
+# 🔥 UNIVERSAL LOADER (VITS Style)
+# Yeh har Sherpa version par chalta hai, chahe woh naya ho ya purana
+try:
+    config = sherpa_onnx.OfflineTtsConfig(
+        model=sherpa_onnx.OfflineTtsModelConfig(
+            vits=sherpa_onnx.OfflineTtsVitsModelConfig(
+                model=model_path,
+                lexicon="",
+                tokens=tokens_path,
+            ),
+        ),
+        rule_fsts="", 
+        max_num_sentences=1,
+    )
+    
+    tts = sherpa_onnx.OfflineTts(config)
+    print("✅ Engine Started Successfully (Universal VITS Mode)!")
+
+except Exception as e:
+    print(f"❌ Engine Crash: {e}")
+    # Last attempt: Raw Dictionary
+    try:
+        print("⚠️ Trying Raw Dictionary Config...")
+        tts = sherpa_onnx.OfflineTts(
+            config={
+                "model": {
+                    "vits": {
+                        "model": model_path,
+                        "tokens": tokens_path,
+                    }
+                }
+            }
+        )
+        print("✅ Raw Engine Started!")
+    except Exception as e2:
+        print(f"❌ Fatal Error: {e2}")
+        exit(1)
+
 app = FastAPI()
+SPEAKER_WAV = "my_voice.wav"
 
 @app.get("/")
 def home():
-    return {"status": "MeloTTS Running"}
+    return {"status": "CosyVoice (Universal) Running 🚀"}
 
 @app.post("/speak")
 async def speak(text: str = Form(...)):
-    print(f"🎙️ Speaking: {text[:20]}...")
+    start_time = time.time()
+    print(f"🎙️ Generating: {text[:20]}...")
     output_path = f"out_{os.urandom(4).hex()}.wav"
 
+    if not os.path.exists(SPEAKER_WAV):
+        return Response(content="Voice sample missing", status_code=500)
+
     try:
-        # EN-India accent sounds very close to Urdu/Hindi
-        # Speed 1.0 is normal
-        speaker_key = 'EN-India'
-        if speaker_key not in speaker_ids:
-             speaker_key = 'EN_INDIA' # Try alternate casing
+        # sid=0 (Auto Speaker)
+        audio = tts.generate(text, sid=0, speed=1.0)
         
-        if speaker_key not in speaker_ids:
-             speaker_key = 'EN-US' # Fallback
+        if len(audio.samples) == 0:
+             return Response(content="Empty Audio", status_code=500)
              
-        model.tts_to_file(text, speaker_ids[speaker_key], output_path, speed=1.0)
+        audio.save(output_path)
+        
+        print(f"✅ Generated in {time.time() - start_time:.2f}s")
         
         with open(output_path, "rb") as f:
             data = f.read()
