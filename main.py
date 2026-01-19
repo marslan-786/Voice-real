@@ -3,11 +3,15 @@ import uvicorn
 from fastapi import FastAPI, Form, Response
 from melo.api import TTS
 
-# 🚀 Pre-load Model on Startup
-print("⏳ Initializing MeloTTS (Might download assets on first run)...")
+print("⏳ Initializing MeloTTS...")
 device = 'cpu'
-model = TTS(language='EN', device=device)
-speaker_ids = model.hps.data.spk2id
+try:
+    # EN-India accent is best for Urdu
+    model = TTS(language='EN', device=device)
+    speaker_ids = model.hps.data.spk2id
+    print("✅ MeloTTS Loaded Successfully!")
+except Exception as e:
+    print(f"❌ Initialization Error: {e}")
 
 app = FastAPI()
 
@@ -19,16 +23,11 @@ def home():
 async def speak(text: str = Form(...)):
     print(f"🎙️ Generating: {text[:20]}...")
     output_path = "output.wav"
-    
     try:
-        # EN-India accent handles Urdu nuance best
         model.tts_to_file(text, speaker_ids['EN-India'], output_path, speed=1.0)
-        
         with open(output_path, "rb") as f:
             audio_data = f.read()
-            
         return Response(content=audio_data, media_type="audio/wav")
-        
     except Exception as e:
         print(f"❌ Error: {e}")
         return Response(content=str(e), status_code=500)
