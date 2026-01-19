@@ -1,4 +1,4 @@
-# ✅ Python 3.10 is most stable for Coqui TTS
+# ✅ Using Python 3.10 (Most Stable for Coqui TTS)
 FROM python:3.10-slim
 
 # ✅ System Dependencies
@@ -15,26 +15,24 @@ WORKDIR /app
 # ✅ Upgrade pip
 RUN pip install --upgrade pip
 
-# ✅ Install PyTorch first (CPU Version)
-RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+# ✅ Install Specific PyTorch (2.4.0) to avoid Security Error
+# Yeh version Coqui TTS ke sath 100% compatible hai aur 'WeightsUnpickler' error nahi deta
+RUN pip install --no-cache-dir torch==2.4.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cpu
 
 # ✅ Install Coqui TTS (The Voice Cloning Beast)
-# ہم اس کا مخصوص ورژن انسٹال کر رہے ہیں جو سٹیبل ہے
 RUN pip install --no-cache-dir tts
 
 # ✅ Install API Server Requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ✅ Accept Coqui License (Environment Variable)
+# ✅ Accept Coqui License
 ENV COQUI_TOS_AGREED=1
 
 # Copy App Code
 COPY main.py .
 
-# ⚠️ IMPORTANT: Aapki awaaz ka sample yahan hona chahiye
-# Agar nahi hai to code default use karega ya error dega.
-# Behtar hai ke aap 'my_voice.wav' project mein upload karein.
-COPY male_voice.wav . 
+# ⚠️ Make sure 'my_voice.wav' is in your repo
+COPY my_voice.wav . 
 
 CMD ["python", "main.py"]
