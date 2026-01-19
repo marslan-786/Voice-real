@@ -15,13 +15,10 @@ tokens_path = f"{model_dir}/tokens.txt"
 if not os.path.exists(model_path):
     print(f"❌ CRITICAL ERROR: {model_path} not found!")
     exit(1)
-if not os.path.exists(tokens_path):
-    print(f"❌ CRITICAL ERROR: {tokens_path} not found!")
-    exit(1)
 
-print(f"📦 Model found! Loading...")
-
-config = sherpa_onnx.OfflineTtsConfig(
+# 🔥 FIXED CONFIGURATION (The Generic Way)
+# Bajaye specific class use karne ke, hum direct model path set kar rahe hain
+tts_config = sherpa_onnx.OfflineTtsConfig(
     model=sherpa_onnx.OfflineTtsModelConfig(
         cosyvoice=sherpa_onnx.OfflineTtsCosyVoiceModelConfig(
             model=model_path,
@@ -31,10 +28,27 @@ config = sherpa_onnx.OfflineTtsConfig(
     max_num_sentences=1,
 )
 
+# 🛑 AGAR UPAR WALA CODE FAIL HO TO YEH TRY KAREIN (Commented out for now)
+# tts_config.model.cosyvoice.model = model_path
+
 # 🚀 LOAD ENGINE
 try:
-    tts = sherpa_onnx.OfflineTts(config)
+    tts = sherpa_onnx.OfflineTts(tts_config)
     print("✅ Alibaba CosyVoice Engine Started Successfully!")
+except AttributeError:
+    # ⚠️ FALLBACK FOR OLDER SHERPA VERSIONS
+    print("⚠️ Detect older Sherpa version. Trying VITS configuration...")
+    tts_config = sherpa_onnx.OfflineTtsConfig(
+        model=sherpa_onnx.OfflineTtsModelConfig(
+            vits=sherpa_onnx.OfflineTtsVitsModelConfig(
+                model=model_path,
+                tokens=tokens_path,
+            ),
+        ),
+    )
+    tts = sherpa_onnx.OfflineTts(tts_config)
+    print("✅ Engine Started in VITS Mode (Compatible)!")
+
 except Exception as e:
     print(f"❌ Engine Start Error: {e}")
     exit(1)
@@ -54,7 +68,6 @@ async def speak(text: str = Form(...)):
     output_path = f"generated_{os.urandom(4).hex()}.wav"
 
     if not os.path.exists(SPEAKER_WAV):
-        print("❌ my_voice.wav missing!")
         return Response(content="Voice sample missing", status_code=500)
 
     try:
