@@ -35,6 +35,6 @@ COPY main.py .
 # ⚠️ IMPORTANT: Aapki awaaz ka sample yahan hona chahiye
 # Agar nahi hai to code default use karega ya error dega.
 # Behtar hai ke aap 'my_voice.wav' project mein upload karein.
-COPY my_voice.wav . 
+COPY male_voice.wav . 
 
 CMD ["python", "main.py"]
