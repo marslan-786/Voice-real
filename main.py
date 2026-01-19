@@ -7,12 +7,12 @@ import time
 print("⏳ Initializing Alibaba CosyVoice (via Sherpa-ONNX)...")
 
 # ⚙️ MODEL CONFIGURATION
-# یہ سیٹنگز CPU پر بیسٹ پرفارمنس کے لیے ہیں
+# Hugging Face Repo se file ka naam 'model.onnx' hota hai
 model_dir = "./model_data"
 config = sherpa_onnx.OfflineTtsConfig(
     model=sherpa_onnx.OfflineTtsModelConfig(
         cosyvoice=sherpa_onnx.OfflineTtsCosyVoiceModelConfig(
-            model=f"{model_dir}/cosyvoice-model.onnx",
+            model=f"{model_dir}/model.onnx", # ✅ Corrected Name
         ),
     ),
     rule_fsts=f"{model_dir}/date.fst,{model_dir}/phone.fst",
@@ -25,6 +25,7 @@ try:
     print("✅ Alibaba CosyVoice Engine Started Successfully!")
 except Exception as e:
     print(f"❌ Engine Start Error: {e}")
+    # Agar error aye to exit karo takay logs mein nazar aye
     exit(1)
 
 app = FastAPI()
@@ -42,15 +43,16 @@ async def speak(text: str = Form(...)):
     output_path = f"generated_{os.urandom(4).hex()}.wav"
 
     if not os.path.exists(SPEAKER_WAV):
+        print("❌ my_voice.wav NOT FOUND!")
         return Response(content="Error: my_voice.wav not found!", status_code=500)
 
     try:
         # 🔥 GENERATION COMMAND
-        # sid=0 (Automatic Language Detection)
+        # sid=0 means auto-detect language based on text
         audio = tts.generate(text, sid=0, speed=1.0)
         
-        # Save audio (Sherpa generates raw samples, we save as Wav)
         if len(audio.samples) == 0:
+             print("❌ Sherpa generated 0 bytes audio")
              return Response(content="Empty Audio Generated", status_code=500)
              
         audio.save(output_path)
@@ -58,7 +60,6 @@ async def speak(text: str = Form(...)):
         duration = time.time() - start_time
         print(f"✅ Generated in {duration:.2f} seconds!")
 
-        # Read and Return
         with open(output_path, "rb") as f:
             audio_data = f.read()
         
@@ -66,7 +67,7 @@ async def speak(text: str = Form(...)):
         return Response(content=audio_data, media_type="audio/wav")
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Generation Error: {e}")
         return Response(content=str(e), status_code=500)
 
 if __name__ == "__main__":
