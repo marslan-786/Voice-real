@@ -8,11 +8,12 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# ✅ Force Latest Version of Sherpa-ONNX
+# ✅ Install Specific Stable Version (1.10.16)
+# Yeh version CosyVoice support ke sath aya tha aur stable tha
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir sherpa-onnx>=1.10.16 fastapi uvicorn python-multipart
+    pip install --no-cache-dir sherpa-onnx==1.10.16 fastapi uvicorn python-multipart
 
-# ✅ DOWNLOAD MODEL
+# ✅ DOWNLOAD MODEL (Direct Curl)
 RUN mkdir -p model_data
 RUN curl -L -o model_data/model.onnx "https://huggingface.co/csukuangfj/sherpa-onnx-tts-cosyvoice-300m-sft/resolve/main/model.onnx"
 RUN curl -L -o model_data/tokens.txt "https://huggingface.co/csukuangfj/sherpa-onnx-tts-cosyvoice-300m-sft/resolve/main/tokens.txt"
