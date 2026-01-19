@@ -3,22 +3,23 @@ FROM python:3.10-slim
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y \
-    build-essential curl ffmpeg \
+    build-essential git curl ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# ✅ Install Specific Stable Version (1.10.45)
-# Yeh version PyPI par mojood hai aur CosyVoice support karta hai
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir sherpa-onnx==1.10.45 fastapi uvicorn python-multipart
+# ✅ Install Pure Python Dependencies (No complex C++ engines)
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir fastapi uvicorn python-multipart torch torchaudio
 
-# ✅ DOWNLOAD MODEL (Direct Curl)
-RUN mkdir -p model_data
-RUN curl -L -o model_data/model.onnx "https://huggingface.co/csukuangfj/sherpa-onnx-tts-cosyvoice-300m-sft/resolve/main/model.onnx"
-RUN curl -L -o model_data/tokens.txt "https://huggingface.co/csukuangfj/sherpa-onnx-tts-cosyvoice-300m-sft/resolve/main/tokens.txt"
+# ✅ Install MeloTTS (Direct form GitHub but WITHOUT MeCab dependency manually)
+# Hum MeloTTS ka code clone kar ke usay 'lite' mode mein chalayen ge
+RUN git clone https://github.com/myshell-ai/MeloTTS.git
+WORKDIR /app/MeloTTS
+RUN pip install -e .
+RUN python -m unidic download 
 
-COPY my_voice.wav .
+WORKDIR /app
 COPY main.py .
 
 CMD ["python", "main.py"]
