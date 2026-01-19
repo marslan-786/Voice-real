@@ -8,15 +8,13 @@ device = 'cpu'
 model = TTS(language='EN', device=device)
 speaker_ids = model.hps.data.spk2id
 
-# 🔍 DEBUG: Print available speakers to Console
-print("\n🎤 AVAILABLE SPEAKERS:", speaker_ids)
-print("--------------------------------------\n")
+print(f"\n🎤 AVAILABLE SPEAKERS: {speaker_ids}\n")
 
 app = FastAPI()
 
 @app.get("/")
 def home():
-    return {"status": "MeloTTS Running", "speakers": str(speaker_ids)}
+    return {"status": "MeloTTS Ready", "speakers": str(speaker_ids)}
 
 @app.post("/speak")
 async def speak(text: str = Form(...)):
@@ -24,25 +22,15 @@ async def speak(text: str = Form(...)):
     output_path = "output.wav"
     
     try:
-        # 🧠 SMART SPEAKER SELECTION
-        # پہلے 'EN-India' ڈھونڈو، اگر نہ ملے تو 'EN-US'، وہ بھی نہ ملے تو لسٹ کا پہلا والا اٹھا لو
+        # 🎯 EXACT MATCH from Logs
+        # لاگز کے مطابق صحیح نام 'EN_INDIA' ہے
+        speaker_key = 'EN_INDIA' 
         
-        # Note: speaker_ids might be a Dict or HParams object
-        spk_dict = dict(speaker_ids) # Safe convert to dict
-        
-        selected_speaker = spk_dict.get('EN-India')
-        if selected_speaker is None:
-            selected_speaker = spk_dict.get('EN_India') # Try with underscore
-        if selected_speaker is None:
-            selected_speaker = spk_dict.get('EN-US') # Fallback to US
-        if selected_speaker is None:
-            # Absolute fallback: Pick the first available key
-            first_key = list(spk_dict.keys())[0]
-            selected_speaker = spk_dict[first_key]
-            print(f"⚠️ 'EN-India' not found. Using fallback: {first_key}")
-
-        # Generate Audio
-        model.tts_to_file(text, selected_speaker, output_path, speed=1.0)
+        # Fallback if key changes
+        if speaker_key not in speaker_ids:
+            speaker_key = 'EN-US'
+            
+        model.tts_to_file(text, speaker_ids[speaker_key], output_path, speed=1.0)
         
         with open(output_path, "rb") as f:
             audio_data = f.read()
