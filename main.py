@@ -2,11 +2,10 @@ import os
 import uvicorn
 from fastapi import FastAPI, Form, Response
 from melo.api import TTS
-import torch
 
-# 🚀 INITIALIZATION (Heavy Load)
-print("⏳ Loading MeloTTS Model (This allows 32GB usage)...")
-device = 'cpu' # Railway uses high-end CPUs
+# 🚀 Pre-load Model on Startup
+print("⏳ Initializing MeloTTS (Might download assets on first run)...")
+device = 'cpu'
 model = TTS(language='EN', device=device)
 speaker_ids = model.hps.data.spk2id
 
@@ -14,19 +13,17 @@ app = FastAPI()
 
 @app.get("/")
 def home():
-    return {"status": "Voice Server is Running 🔥"}
+    return {"status": "MeloTTS Voice Server Running 🚀"}
 
 @app.post("/speak")
 async def speak(text: str = Form(...)):
-    print(f"🎙️ Generating Voice for: {text[:20]}...")
-    
+    print(f"🎙️ Generating: {text[:20]}...")
     output_path = "output.wav"
     
     try:
-        # Accent: EN-India (Best for Urdu Nuance)
+        # EN-India accent handles Urdu nuance best
         model.tts_to_file(text, speaker_ids['EN-India'], output_path, speed=1.0)
         
-        # Read file into memory
         with open(output_path, "rb") as f:
             audio_data = f.read()
             
