@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir tts fastapi uvicorn python-multipart
 RUN python3 -c "from TTS.api import TTS; TTS('tts_models/multilingual/multi-dataset/xtts_v2').to('cpu')"
 
 # ⚠️ Copy Voice File (Make sure updated wav file is here)
-COPY my_voice.wav .
+COPY *.wav .
 COPY main.py .
 
 CMD ["python", "main.py"]
