@@ -14,9 +14,13 @@ print(f"🚀 CPU Cores Detected: {os.cpu_count()}")
 print(f"🔥 Active Threads set to: {torch.get_num_threads()}")
 
 print("⏳ Loading XTTS v2 Model from Cache...")
-# Model pehle se downloaded hai (Dockerfile ki waja se), foran load hoga
-tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
-print("✅ Model Loaded Successfully!")
+try:
+    # Model pehle se downloaded hai
+    tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
+    print("✅ Model Loaded Successfully!")
+except Exception as e:
+    print(f"❌ Model Load Error: {e}")
+    exit(1)
 
 app = FastAPI()
 SPEAKER_WAV = "my_voice.wav"
@@ -36,12 +40,12 @@ async def speak(text: str = Form(...)):
         return Response(content="Voice sample missing", status_code=500)
 
     try:
-        # 🔥 GENERATION
-        # language="ur" ya "hi" use karein best result ke liye
+        # 🔥 CRITICAL FIX: Use 'hi' (Hindi) for Urdu text
+        # XTTS mein Urdu 'hi' engine ke through best chalti hai
         tts.tts_to_file(
             text=text, 
             speaker_wav=SPEAKER_WAV, 
-            language="ur", 
+            language="hi",  # ✅ Changed from 'ur' to 'hi'
             file_path=output_path
         )
         
