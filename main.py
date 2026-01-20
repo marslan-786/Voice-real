@@ -3,21 +3,22 @@ import uvicorn
 import torch
 import time
 import gc
+import subprocess
 from fastapi import FastAPI, Form, Response
 from TTS.api import TTS
 
-# 🔥 OPTIMIZED THREADS (32 is too much overhead, 16 is sweet spot)
-torch.set_num_threads(16)
-os.environ["OMP_NUM_THREADS"] = "16"
-os.environ["MKL_NUM_THREADS"] = "16"
+# 🔥 FORCE 32 CORES & OPTIMIZATIONS
+torch.set_num_threads(32)
+os.environ["OMP_NUM_THREADS"] = "32"
+os.environ["MKL_NUM_THREADS"] = "32"
 
-print(f"🚀 System CPU Cores: {os.cpu_count()}")
-print(f"🔥 Active Threads: {torch.get_num_threads()}")
-
-# ✅ LOAD MODEL ONCE (Global Variable)
-print("⏳ Loading XTTS Model into RAM...")
-tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
-print("✅ Model Ready & Locked in RAM!")
+print("⏳ Loading XTTS Model (High Quality)...")
+try:
+    tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
+    print("✅ Model Loaded!")
+except Exception as e:
+    print(f"❌ Load Error: {e}")
+    exit(1)
 
 app = FastAPI()
 SPEAKER_WAV = "my_voice.wav"
@@ -25,35 +26,48 @@ SPEAKER_WAV = "my_voice.wav"
 @app.post("/speak")
 async def speak(text: str = Form(...)):
     start_time = time.time()
-    print(f"🎙️ New Request: {text[:30]}...")
+    print(f"🎙️ Input Text: {text[:30]}...")
     
-    output_path = f"out_{os.urandom(4).hex()}.wav"
+    wav_path = f"temp_{os.urandom(4).hex()}.wav"
+    ogg_path = f"out_{os.urandom(4).hex()}.ogg"
 
     if not os.path.exists(SPEAKER_WAV):
         return Response(content="Voice sample missing", status_code=500)
 
     try:
-        # 🔥 GENERATION (No Reloading)
+        # 🔥 GENERATION TWEAKS
+        # split_sentences=False (Emotion kill nahi hoga)
+        # speed=1.1 (Thora tez bolega, natural lagega)
         tts.tts_to_file(
             text=text, 
             speaker_wav=SPEAKER_WAV, 
             language="hi", 
-            file_path=output_path,
-            split_sentences=True # Sentences todne se memory kam use hogi
+            file_path=wav_path,
+            split_sentences=False, 
+            speed=1.1  
         )
         
-        duration = time.time() - start_time
-        print(f"✅ Generated in {duration:.2f}s")
+        # 🎵 CONVERT TO WHATSAPP FORMAT (OGG OPUS)
+        # Yeh step file ko 'PTT' banata hai jo foran play hoti hai
+        subprocess.run([
+            "ffmpeg", "-y", "-i", wav_path, 
+            "-c:a", "libopus", "-b:a", "64k", "-vbr", "on", "-compression_level", "10",
+            ogg_path
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        with open(output_path, "rb") as f:
+        duration = time.time() - start_time
+        print(f"✅ Generated & Converted in {duration:.2f}s")
+
+        with open(ogg_path, "rb") as f:
             data = f.read()
         
-        os.remove(output_path)
-
-        # 🧹 CLEANUP MEMORY (Crucial Step)
-        gc.collect()
+        # Cleanup
+        if os.path.exists(wav_path): os.remove(wav_path)
+        if os.path.exists(ogg_path): os.remove(ogg_path)
+        gc.collect() # RAM Safai
         
-        return Response(content=data, media_type="audio/wav")
+        # Return proper OGG MIME type
+        return Response(content=data, media_type="audio/ogg")
 
     except Exception as e:
         print(f"❌ Error: {e}")
