@@ -3,7 +3,6 @@ import uvicorn
 import torch
 import time
 import gc
-import subprocess
 from fastapi import FastAPI, Form, Response
 from TTS.api import TTS
 
@@ -14,6 +13,7 @@ os.environ["MKL_NUM_THREADS"] = "32"
 
 print("⏳ Loading XTTS Model (High Quality)...")
 try:
+    # Model load
     tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
     print("✅ Model Loaded!")
 except Exception as e:
@@ -28,46 +28,37 @@ async def speak(text: str = Form(...)):
     start_time = time.time()
     print(f"🎙️ Input Text: {text[:30]}...")
     
-    wav_path = f"temp_{os.urandom(4).hex()}.wav"
-    ogg_path = f"out_{os.urandom(4).hex()}.ogg"
+    # Sirf WAV file banegi ab
+    output_path = f"out_{os.urandom(4).hex()}.wav"
 
     if not os.path.exists(SPEAKER_WAV):
         return Response(content="Voice sample missing", status_code=500)
 
     try:
-        # 🔥 GENERATION TWEAKS
-        # split_sentences=False (Emotion kill nahi hoga)
-        # speed=1.1 (Thora tez bolega, natural lagega)
+        # 🔥 GENERATION
+        # Hindi script for Urdu pronunciation
+        # split_sentences=False for better emotion flow
         tts.tts_to_file(
             text=text, 
             speaker_wav=SPEAKER_WAV, 
             language="hi", 
-            file_path=wav_path,
+            file_path=output_path,
             split_sentences=False, 
             speed=1.1  
         )
         
-        # 🎵 CONVERT TO WHATSAPP FORMAT (OGG OPUS)
-        # Yeh step file ko 'PTT' banata hai jo foran play hoti hai
-        subprocess.run([
-            "ffmpeg", "-y", "-i", wav_path, 
-            "-c:a", "libopus", "-b:a", "64k", "-vbr", "on", "-compression_level", "10",
-            ogg_path
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
         duration = time.time() - start_time
-        print(f"✅ Generated & Converted in {duration:.2f}s")
+        print(f"✅ Generated in {duration:.2f}s")
 
-        with open(ogg_path, "rb") as f:
+        # 📤 Send Raw WAV to Go
+        with open(output_path, "rb") as f:
             data = f.read()
         
         # Cleanup
-        if os.path.exists(wav_path): os.remove(wav_path)
-        if os.path.exists(ogg_path): os.remove(ogg_path)
-        gc.collect() # RAM Safai
+        if os.path.exists(output_path): os.remove(output_path)
+        gc.collect() # RAM Cleanup
         
-        # Return proper OGG MIME type
-        return Response(content=data, media_type="audio/ogg")
+        return Response(content=data, media_type="audio/wav")
 
     except Exception as e:
         print(f"❌ Error: {e}")
