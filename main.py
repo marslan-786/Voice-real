@@ -6,7 +6,11 @@ import gc
 from fastapi import FastAPI, Form, Response
 from TTS.api import TTS
 
-# ... (Thread settings same as before) ...
+# 🔥 THREADS SETTING (8 for Stability)
+NUM_THREADS = "8"
+os.environ["OMP_NUM_THREADS"] = NUM_THREADS
+os.environ["MKL_NUM_THREADS"] = NUM_THREADS
+torch.set_num_threads(int(NUM_THREADS))
 
 print("⏳ Loading XTTS Model...")
 try:
@@ -17,17 +21,19 @@ except Exception as e:
     exit(1)
 
 app = FastAPI()
+SPEAKER_WAV = "my_voice.wav" # Default Fallback
 
-# Default fallback voice
-DEFAULT_VOICE = "voice_1.wav"
+# ✅✅✅ NEW HEALTH CHECK ROUTE (Fixes 404 Error) ✅✅✅
+@app.get("/")
+def home():
+    return {"status": "alive", "message": "XTTS Server is Ready!"}
 
 @app.post("/speak")
-async def speak(text: str = Form(...), speaker: str = Form(DEFAULT_VOICE)):
+async def speak(text: str = Form(...), speaker: str = Form(SPEAKER_WAV)):
     start_time = time.time()
     
-    # ✅ Check if requested voice exists, else use default
-    target_voice = speaker if os.path.exists(speaker) else DEFAULT_VOICE
-    
+    # Check if requested voice exists
+    target_voice = speaker if os.path.exists(speaker) else SPEAKER_WAV
     print(f"🎙️ Generating: {text[:20]}... | 🗣️ Voice: {target_voice}")
     
     output_path = f"out_{os.urandom(4).hex()}.wav"
@@ -36,7 +42,7 @@ async def speak(text: str = Form(...), speaker: str = Form(DEFAULT_VOICE)):
         # 🔥 GENERATION
         tts.tts_to_file(
             text=text, 
-            speaker_wav=target_voice, # 👈 Dynamic Voice Here
+            speaker_wav=target_voice,
             language="hi", 
             file_path=output_path,
             split_sentences=False, 
@@ -44,8 +50,9 @@ async def speak(text: str = Form(...), speaker: str = Form(DEFAULT_VOICE)):
             temperature=0.8
         )
         
-        # ... (File sending and cleanup code same as before) ...
-        
+        duration = time.time() - start_time
+        print(f"✅ Generated in {duration:.2f}s")
+
         with open(output_path, "rb") as f:
             data = f.read()
         
@@ -57,3 +64,14 @@ async def speak(text: str = Form(...), speaker: str = Form(DEFAULT_VOICE)):
     except Exception as e:
         print(f"❌ Error: {e}")
         return Response(content=str(e), status_code=500)
+
+# ✅ AUDIO TRANSCRIPTION (Whisper Support if needed)
+@app.post("/transcribe")
+async def transcribe(file: bytes = Form(...)):
+    # Yahan agar aap ne Whisper lagaya hai to uska code ayega
+    # Filhal dummy return kar raha hu taakay error na aye
+    return {"text": "Transcription feature pending implementation."}
+
+if __name__ == "__main__":
+    # 0.0.0.0 is Must for Docker/Railway
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
