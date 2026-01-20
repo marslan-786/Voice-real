@@ -1,14 +1,17 @@
 FROM python:3.10-slim
 
-# ✅ Fast Logs & Performance
+# ✅ Fast Logs
 ENV PYTHONUNBUFFERED=1
-ENV OMP_NUM_THREADS=32
-ENV MKL_NUM_THREADS=32
-ENV TORCH_NUM_THREADS=32
+
+# 🔥 PERFORMANCE TUNING (Fixed to 8 for Stability)
+# 32 Threads CPU ko 'choke' kar dete hain, 8 best speed dete hain.
+ENV OMP_NUM_THREADS=8
+ENV MKL_NUM_THREADS=8
+ENV TORCH_NUM_THREADS=8
 ENV COQUI_TOS_AGREED=1
 
-# ✅ Install System Dependencies (FFmpeg is HERE)
-# یہ لائن FFmpeg کو سسٹم میں انسٹال کر رہی ہے 👇
+# ✅ Install System Dependencies
+# FFmpeg zaroori hai agar hum kabhi conversion karein
 RUN apt-get update && apt-get install -y \
     build-essential git curl ffmpeg \
     && rm -rf /var/lib/apt/lists/*
@@ -17,19 +20,19 @@ WORKDIR /app
 
 RUN pip install --upgrade pip
 
-# ✅ CRITICAL FIX 1: Pin PyTorch to 2.2.0 (Stable for Coqui)
+# ✅ Pin PyTorch to Stable Version (Security Warning Bypass)
 RUN pip install --no-cache-dir torch==2.2.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cpu
 
-# ✅ CRITICAL FIX 2: Pin Transformers (to avoid BeamSearchScorer error)
+# ✅ Pin Transformers
 RUN pip install --no-cache-dir transformers==4.40.0
 
-# ✅ Install Coqui TTS & API Server
+# ✅ Install Coqui TTS & Server
 RUN pip install --no-cache-dir tts fastapi uvicorn python-multipart
 
 # ✅ PRE-DOWNLOAD MODEL
 RUN python3 -c "from TTS.api import TTS; TTS('tts_models/multilingual/multi-dataset/xtts_v2').to('cpu')"
 
-# ⚠️ Make sure my_voice.wav is present
+# ⚠️ Copy Voice File (Make sure updated wav file is here)
 COPY my_voice.wav .
 COPY main.py .
 

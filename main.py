@@ -6,16 +6,21 @@ import gc
 from fastapi import FastAPI, Form, Response
 from TTS.api import TTS
 
-# 🔥 FORCE 32 CORES & OPTIMIZATIONS
-torch.set_num_threads(32)
-os.environ["OMP_NUM_THREADS"] = "32"
-os.environ["MKL_NUM_THREADS"] = "32"
+# 🔥 PERFORMANCE TUNING (The Real Fix)
+# 32 Threads causing deadlock/hangs on 2nd request.
+# 8 Threads is the sweet spot for fastest CPU Inference.
+NUM_THREADS = "8"
+os.environ["OMP_NUM_THREADS"] = NUM_THREADS
+os.environ["MKL_NUM_THREADS"] = NUM_THREADS
+torch.set_num_threads(int(NUM_THREADS))
 
-print("⏳ Loading XTTS Model (High Quality)...")
+print(f"🚀 Optimized Configuration: {NUM_THREADS} Active Threads (Preventing Deadlock)")
+
+print("⏳ Loading XTTS Model...")
 try:
-    # Model load
+    # Model Load
     tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
-    print("✅ Model Loaded!")
+    print("✅ Model Loaded & Ready!")
 except Exception as e:
     print(f"❌ Load Error: {e}")
     exit(1)
@@ -26,9 +31,8 @@ SPEAKER_WAV = "my_voice.wav"
 @app.post("/speak")
 async def speak(text: str = Form(...)):
     start_time = time.time()
-    print(f"🎙️ Input Text: {text[:30]}...")
+    print(f"🎙️ Generating: {text[:30]}...")
     
-    # Sirf WAV file banegi ab
     output_path = f"out_{os.urandom(4).hex()}.wav"
 
     if not os.path.exists(SPEAKER_WAV):
@@ -36,8 +40,7 @@ async def speak(text: str = Form(...)):
 
     try:
         # 🔥 GENERATION
-        # Hindi script for Urdu pronunciation
-        # split_sentences=False for better emotion flow
+        # split_sentences=False (Flow acha rahega)
         tts.tts_to_file(
             text=text, 
             speaker_wav=SPEAKER_WAV, 
@@ -50,13 +53,14 @@ async def speak(text: str = Form(...)):
         duration = time.time() - start_time
         print(f"✅ Generated in {duration:.2f}s")
 
-        # 📤 Send Raw WAV to Go
         with open(output_path, "rb") as f:
             data = f.read()
         
         # Cleanup
         if os.path.exists(output_path): os.remove(output_path)
-        gc.collect() # RAM Cleanup
+        
+        # 🧹 AGGRESSIVE RAM CLEANUP
+        gc.collect()
         
         return Response(content=data, media_type="audio/wav")
 
