@@ -1,26 +1,29 @@
 import os
 import uvicorn
+import torch
+import time
 from fastapi import FastAPI, Form, Response
-# MeloTTS Imports
-from melo.api import TTS
+from TTS.api import TTS
 
-print("⏳ Initializing MeloTTS (CPU Mode)...")
+# 🔥 FORCE 32 CORES (Engine Turbo Mode)
+torch.set_num_threads(32)
+os.environ["OMP_NUM_THREADS"] = "32"
+os.environ["MKL_NUM_THREADS"] = "32"
 
-try:
-    # 'EN' language use kar rahay hain (No MeCab issues)
-    # Device 'cpu' hai (Railway friendly)
-    model = TTS(language='EN', device='cpu')
-    speaker_ids = model.hps.data.spk2id
-    print("✅ MeloTTS Engine Started Successfully!")
-except Exception as e:
-    print(f"❌ Initialization Error: {e}")
-    exit(1)
+print(f"🚀 CPU Cores Detected: {os.cpu_count()}")
+print(f"🔥 Active Threads set to: {torch.get_num_threads()}")
+
+print("⏳ Loading XTTS v2 Model from Cache...")
+# Model pehle se downloaded hai (Dockerfile ki waja se), foran load hoga
+tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
+print("✅ Model Loaded Successfully!")
 
 app = FastAPI()
+SPEAKER_WAV = "my_voice.wav"
 
 @app.get("/")
 def home():
-    return {"status": "MeloTTS Running 🚀"}
+    return {"status": "XTTS v2 Turbo Running", "cores": torch.get_num_threads()}
 
 @app.post("/speak")
 async def speak(text: str = Form(...)):
@@ -29,33 +32,31 @@ async def speak(text: str = Form(...)):
     
     output_path = f"out_{os.urandom(4).hex()}.wav"
 
+    if not os.path.exists(SPEAKER_WAV):
+        return Response(content="Voice sample missing", status_code=500)
+
     try:
-        # 🔥 TRICK: Use 'EN-India' accent for Urdu/Hindi feel
-        # Agar 'EN-India' nahi mila to default 'EN-US' use hoga
-        speaker_key = 'EN-India'
-        if speaker_key not in speaker_ids:
-            speaker_key = 'EN-Default'
-            
-        speaker_id = speaker_ids[speaker_key]
+        # 🔥 GENERATION
+        # language="ur" ya "hi" use karein best result ke liye
+        tts.tts_to_file(
+            text=text, 
+            speaker_wav=SPEAKER_WAV, 
+            language="ur", 
+            file_path=output_path
+        )
         
-        # Generation
-        model.tts_to_file(text, speaker_id, output_path, speed=1.0)
-        
-        # Read & Send
+        duration = time.time() - start_time
+        print(f"✅ Generated in {duration:.2f}s using 32 Cores")
+
         with open(output_path, "rb") as f:
-            audio_data = f.read()
+            data = f.read()
         
         os.remove(output_path)
-        return Response(content=audio_data, media_type="audio/wav")
+        return Response(content=data, media_type="audio/wav")
 
     except Exception as e:
-        print(f"❌ Generation Error: {e}")
-        if os.path.exists(output_path):
-            os.remove(output_path)
+        print(f"❌ Error: {e}")
         return Response(content=str(e), status_code=500)
 
-import time # Forgot to import time above
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
